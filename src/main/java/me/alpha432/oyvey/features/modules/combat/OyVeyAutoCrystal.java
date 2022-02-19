@@ -1,12 +1,10 @@
 package me.alpha432.oyvey.features.modules.combat;
 
-import com.mojang.realmsclient.gui.ChatFormatting;
 import me.alpha432.oyvey.OyVey;
 import me.alpha432.oyvey.event.events.PacketEvent;
 import me.alpha432.oyvey.event.events.Render3DEvent;
 import me.alpha432.oyvey.features.modules.Module;
 import me.alpha432.oyvey.features.modules.client.ClickGui;
-import me.alpha432.oyvey.features.modules.misc.AutoGG;
 import me.alpha432.oyvey.features.setting.Setting;
 import me.alpha432.oyvey.util.Timer;
 import me.alpha432.oyvey.util.*;
@@ -19,11 +17,15 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.Blocks;
 import net.minecraft.init.Items;
 import net.minecraft.init.MobEffects;
+import net.minecraft.init.SoundEvents;
+import net.minecraft.item.ItemEndCrystal;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.ItemSword;
+import net.minecraft.network.play.client.CPacketHeldItemChange;
 import net.minecraft.network.play.client.CPacketPlayer;
 import net.minecraft.network.play.client.CPacketPlayerTryUseItemOnBlock;
 import net.minecraft.network.play.client.CPacketUseEntity;
+import net.minecraft.network.play.server.SPacketSoundEffect;
 import net.minecraft.network.play.server.SPacketSpawnObject;
 import net.minecraft.util.*;
 import net.minecraft.util.math.*;
@@ -37,50 +39,53 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
-public class OyVeyAutoCrystal extends Module {
+public class OyVeyAutoCrystal
+        extends Module {
     private final Timer placeTimer = new Timer();
     private final Timer breakTimer = new Timer();
     private final Timer preditTimer = new Timer();
     private final Timer manualTimer = new Timer();
-    private final Setting<Integer> attackFactor = register(new Setting<Integer>("PredictDelay", 0, 0, 200));
-    private final Setting<Integer> red = register(new Setting<Integer>("Red", 0, 0, 255));
-    private final Setting<Integer> green = register(new Setting<Integer>("Green", 255, 0, 255));
-    private final Setting<Integer> blue = register(new Setting<Integer>("Blue", 0, 0, 255));
-    private final Setting<Integer> alpha = register(new Setting<Integer>("Alpha", 255, 0, 255));
-    private final Setting<Integer> boxAlpha = register(new Setting<Integer>("BoxAlpha", 125, 0, 255));
-    private final Setting<Float> lineWidth = register(new Setting<Float>("LineWidth", Float.valueOf(1.0f), Float.valueOf(0.1f), Float.valueOf(5.0f)));
-    public Setting<Boolean> place = register(new Setting<Boolean>("Place", true));
-    public Setting<Float> placeDelay = register(new Setting<Float>("PlaceDelay", Float.valueOf(4.0f), Float.valueOf(0.0f), Float.valueOf(300.0f)));
-    public Setting<Float> placeRange = register(new Setting<Float>("PlaceRange", Float.valueOf(4.0f), Float.valueOf(0.1f), Float.valueOf(7.0f)));
-    public Setting<Boolean> explode = register(new Setting<Boolean>("Break", true));
-    public Setting<Boolean> packetBreak = register(new Setting<Boolean>("PacketBreak", true));
-    public Setting<Boolean> predicts = register(new Setting<Boolean>("Predict", true));
-    public Setting<Boolean> rotate = register(new Setting<Boolean>("Rotate", true));
-    public Setting<Float> breakDelay = register(new Setting<Float>("BreakDelay", Float.valueOf(4.0f), Float.valueOf(0.0f), Float.valueOf(300.0f)));
-    public Setting<Float> breakRange = register(new Setting<Float>("BreakRange", Float.valueOf(4.0f), Float.valueOf(0.1f), Float.valueOf(7.0f)));
-    public Setting<Float> breakWallRange = register(new Setting<Float>("BreakWallRange", Float.valueOf(4.0f), Float.valueOf(0.1f), Float.valueOf(7.0f)));
-    public Setting<Boolean> ecmeplace = register(new Setting<Boolean>("1.13 Place", true));
-    public Setting<Boolean> suicide = register(new Setting<Boolean>("AntiSuicide", true));
-    public Setting<Boolean> autoswitch = register(new Setting<Boolean>("AutoSwitch", true));
-    public Setting<Boolean> ignoreUseAmount = register(new Setting<Boolean>("IgnoreUseAmount", true));
-    public Setting<Integer> wasteAmount = register(new Setting<Integer>("UseAmount", 4, 1, 5));
-    public Setting<Boolean> facePlaceSword = register(new Setting<Boolean>("FacePlaceSword", true));
-    public Setting<Boolean> removeAttack = register(new Setting("EntityRemove", false));
-    public Setting<Float> targetRange = register(new Setting<Float>("TargetRange", Float.valueOf(4.0f), Float.valueOf(1.0f), Float.valueOf(12.0f)));
-    public Setting<Float> minDamage = register(new Setting<Float>("MinDamage", Float.valueOf(4.0f), Float.valueOf(0.1f), Float.valueOf(20.0f)));
-    public Setting<Float> facePlace = register(new Setting<Float>("FacePlaceHP", Float.valueOf(4.0f), Float.valueOf(0.0f), Float.valueOf(36.0f)));
-    public Setting<Float> breakMaxSelfDamage = register(new Setting<Float>("BreakMaxSelf", Float.valueOf(4.0f), Float.valueOf(0.1f), Float.valueOf(12.0f)));
-    public Setting<Float> breakMinDmg = register(new Setting<Float>("BreakMinDmg", Float.valueOf(4.0f), Float.valueOf(0.1f), Float.valueOf(7.0f)));
-    public Setting<Float> minArmor = register(new Setting<Float>("MinArmor", Float.valueOf(4.0f), Float.valueOf(0.1f), Float.valueOf(80.0f)));
-    public Setting<SwingMode> swingMode = register(new Setting<SwingMode>("Swing", SwingMode.MainHand));
-    public Setting<Boolean> render = register(new Setting<Boolean>("Render", true));
-    public Setting<Boolean> renderDmg = register(new Setting<Boolean>("RenderDmg", true));
-    public Setting<Boolean> box = register(new Setting<Boolean>("Box", true));
-    public Setting<Boolean> outline = register(new Setting<Boolean>("Outline", true));
-    private final Setting<Integer> cRed = register(new Setting<Object>("OL-Red", Integer.valueOf(0), Integer.valueOf(0), Integer.valueOf(255), v -> outline.getValue()));
-    private final Setting<Integer> cGreen = register(new Setting<Object>("OL-Green", Integer.valueOf(0), Integer.valueOf(0), Integer.valueOf(255), v -> outline.getValue()));
-    private final Setting<Integer> cBlue = register(new Setting<Object>("OL-Blue", Integer.valueOf(255), Integer.valueOf(0), Integer.valueOf(255), v -> outline.getValue()));
-    private final Setting<Integer> cAlpha = register(new Setting<Object>("OL-Alpha", Integer.valueOf(255), Integer.valueOf(0), Integer.valueOf(255), v -> outline.getValue()));
+    private final Setting<Integer> attackFactor = this.register(new Setting<>("PredictDelay", 0, 0, 200));
+    private final Setting<Integer> red = this.register(new Setting<>("Red", 0, 0, 255));
+    private final Setting<Integer> green = this.register(new Setting<>("Green", 255, 0, 255));
+    private final Setting<Integer> blue = this.register(new Setting<>("Blue", 0, 0, 255));
+    private final Setting<Integer> alpha = this.register(new Setting<>("Alpha", 255, 0, 255));
+    private final Setting<Integer> boxAlpha = this.register(new Setting<>("BoxAlpha", 125, 0, 255));
+    private final Setting<Float> lineWidth = this.register(new Setting<>("LineWidth", 1.0f, 0.1f, 5.0f));
+    public Setting<Boolean> sound = this.register(new Setting<>("Sequential", true));
+    public Setting<Boolean> place = this.register(new Setting<>("Place", true));
+    public Setting<Float> placeDelay = this.register(new Setting<>("PlaceDelay", 4.0f, 0.0f, 300.0f));
+    public Setting<Float> placeRange = this.register(new Setting<>("PlaceRange", 4.0f, 0.1f, 7.0f));
+    public Setting<Boolean> explode = this.register(new Setting<>("Break", true));
+    public Setting<Boolean> packetBreak = this.register(new Setting<>("PacketBreak", true));
+    public Setting<Boolean> predicts = this.register(new Setting<>("Predict", true));
+    public Setting<Boolean> rotate = this.register(new Setting<>("Rotate", true));
+    public Setting<Float> breakDelay = this.register(new Setting<>("BreakDelay", 4.0f, 0.0f, 300.0f));
+    public Setting<Float> breakRange = this.register(new Setting<>("BreakRange", 4.0f, 0.1f, 7.0f));
+    public Setting<Float> breakWallRange = this.register(new Setting<>("BreakWallRange", 4.0f, 0.1f, 7.0f));
+    public Setting<Boolean> opPlace = this.register(new Setting<>("1.13 Place", true));
+    public Setting<Boolean> suicide = this.register(new Setting<>("AntiSuicide", true));
+    public Setting<Boolean> autoswitch = this.register(new Setting<>("AutoSwitch", true));
+    public Setting<SwitchMode> switchmode = this.register(new Setting<>("SwitchMode", SwitchMode.Normal, v -> this.autoswitch.getValue()));
+    public Setting<Boolean> silentSwitch = this.register(new Setting<>("SilentSwitchHand", true, v -> this.switchmode.getValue() == SwitchMode.Silent));
+    public Setting<Boolean> ignoreUseAmount = this.register(new Setting<>("IgnoreUseAmount", true));
+    public Setting<Integer> wasteAmount = this.register(new Setting<>("UseAmount", 4, 1, 5));
+    public Setting<Boolean> facePlaceSword = this.register(new Setting<>("FacePlaceSword", true));
+    public Setting<Float> targetRange = this.register(new Setting<>("TargetRange", 4.0f, 1.0f, 12.0f));
+    public Setting<Float> minDamage = this.register(new Setting<>("MinDamage", 4.0f, 0.1f, 20.0f));
+    public Setting<Float> facePlace = this.register(new Setting<>("FacePlaceHP", 4.0f, 0.0f, 36.0f));
+    public Setting<Float> breakMaxSelfDamage = this.register(new Setting<>("BreakMaxSelf", 4.0f, 0.1f, 12.0f));
+    public Setting<Float> breakMinDmg = this.register(new Setting<>("BreakMinDmg", 4.0f, 0.1f, 7.0f));
+    public Setting<Float> minArmor = this.register(new Setting<>("MinArmor", 4.0f, 0.1f, 80.0f));
+    public Setting<SwingMode> swingMode = this.register(new Setting<>("Swing", SwingMode.MainHand));
+    public Setting<Boolean> render = this.register(new Setting<>("Render", true));
+    public Setting<Boolean> renderDmg = this.register(new Setting<>("RenderDmg", true));
+    public Setting<Boolean> box = this.register(new Setting<>("Box", true));
+    public Setting<Boolean> outline = this.register(new Setting<>("Outline", true));
+    private final Setting<Integer> cRed = this.register(new Setting<Object>("OL-Red", 0, 0, 255, v -> this.outline.getValue()));
+    private final Setting<Integer> cGreen = this.register(new Setting<Object>("OL-Green", 0, 0, 255, v -> this.outline.getValue()));
+    private final Setting<Integer> cBlue = this.register(new Setting<Object>("OL-Blue", 255, 0, 255, v -> this.outline.getValue()));
+    private final Setting<Integer> cAlpha = this.register(new Setting<Object>("OL-Alpha", 255, 0, 255, v -> this.outline.getValue()));
     EntityEnderCrystal crystal;
     private EntityLivingBase target;
     private BlockPos pos;
@@ -92,17 +97,17 @@ public class OyVeyAutoCrystal extends Module {
     private int predictPackets;
     private boolean packetCalc;
     private float yaw = 0.0f;
-    public EntityLivingBase realTarget;
+    private EntityLivingBase realTarget;
     private int predict;
     private float pitch = 0.0f;
     private boolean rotating = false;
 
     public OyVeyAutoCrystal() {
-        super("OyVeyAutoCrystal", "NiggaHack ac best ac", Module.Category.COMBAT, true, false, false);
+        super("AutoCrystalOld", "skitty ac best ac", Module.Category.COMBAT, true, false, false);
     }
 
     public static List<BlockPos> getSphere(BlockPos loc, float r, int h, boolean hollow, boolean sphere, int plus_y) {
-        ArrayList<BlockPos> circleblocks = new ArrayList<BlockPos>();
+        ArrayList<BlockPos> circleblocks = new ArrayList<>();
         int cx = loc.getX();
         int cy = loc.getY();
         int cz = loc.getZ();
@@ -131,71 +136,82 @@ public class OyVeyAutoCrystal extends Module {
 
     @SubscribeEvent
     public void onPacketSend(PacketEvent.Send event) {
-        if (event.getStage() == 0 && rotate.getValue().booleanValue() && rotating && event.getPacket() instanceof CPacketPlayer) {
+        if (event.getStage() == 0 && this.rotate.getValue() && this.rotating && event.getPacket() instanceof CPacketPlayer) {
             CPacketPlayer packet = event.getPacket();
-            packet.yaw = yaw;
-            packet.pitch = pitch;
-            rotating = false;
+            packet.yaw = this.yaw;
+            packet.pitch = this.pitch;
+            this.rotating = false;
         }
-        if (event.getStage() == 0 && event.getPacket() instanceof CPacketUseEntity) {
-            CPacketUseEntity packet = event.getPacket();
-            if (removeAttack.getValue()) {
-                packet.getEntityFromWorld(mc.world).setDead();
-                mc.world.removeEntityFromWorld(packet.entityId);
+    }
 
+    @SubscribeEvent(priority = EventPriority.HIGH, receiveCanceled = true)
+    public void onSoundPacket(PacketEvent.Receive event) {
+        if (AutoCrystal.fullNullCheck()) {
+            return;
+        }
+        if (event.getPacket() instanceof SPacketSoundEffect && this.sound.getValue()) {
+            final SPacketSoundEffect packet2 = event.getPacket();
+            if (packet2.getCategory() == SoundCategory.BLOCKS && packet2.getSound() == SoundEvents.ENTITY_GENERIC_EXPLODE) {
+                final List<Entity> entities = new ArrayList<>(this.mc.world.loadedEntityList);
+                for (int size = entities.size(), i = 0; i < size; ++i) {
+                    final Entity entity = entities.get(i);
+                    if (entity instanceof EntityEnderCrystal && entity.getDistanceSq(packet2.getX(), packet2.getY(), packet2.getZ()) < 36.0) {
+                        entity.setDead();
+                    }
+                }
             }
         }
     }
 
     private void rotateTo(Entity entity) {
-        if (rotate.getValue().booleanValue()) {
+        if (this.rotate.getValue()) {
             float[] angle = MathUtil.calcAngle(OyVeyAutoCrystal.mc.player.getPositionEyes(mc.getRenderPartialTicks()), entity.getPositionVector());
-            yaw = angle[0];
-            pitch = angle[1];
-            rotating = true;
+            this.yaw = angle[0];
+            this.pitch = angle[1];
+            this.rotating = true;
         }
     }
 
     private void rotateToPos(BlockPos pos) {
-        if (rotate.getValue().booleanValue()) {
+        if (this.rotate.getValue()) {
             float[] angle = MathUtil.calcAngle(OyVeyAutoCrystal.mc.player.getPositionEyes(mc.getRenderPartialTicks()), new Vec3d((float) pos.getX() + 0.5f, (float) pos.getY() - 0.5f, (float) pos.getZ() + 0.5f));
-            yaw = angle[0];
-            pitch = angle[1];
-            rotating = true;
+            this.yaw = angle[0];
+            this.pitch = angle[1];
+            this.rotating = true;
         }
     }
 
     @Override
     public void onEnable() {
-        placeTimer.reset();
-        breakTimer.reset();
-        predictWait = 0;
-        hotBarSlot = -1;
-        pos = null;
-        crystal = null;
-        predict = 0;
-        predictPackets = 1;
-        target = null;
-        packetCalc = false;
-        realTarget = null;
-        armor = false;
-        armorTarget = false;
+        this.placeTimer.reset();
+        this.breakTimer.reset();
+        this.predictWait = 0;
+        this.hotBarSlot = -1;
+        this.pos = null;
+        this.crystal = null;
+        this.predict = 0;
+        this.predictPackets = 1;
+        this.target = null;
+        this.packetCalc = false;
+        this.realTarget = null;
+        this.armor = false;
+        this.armorTarget = false;
     }
 
     @Override
     public void onDisable() {
-        rotating = false;
+        this.rotating = false;
     }
 
     @Override
     public void onTick() {
-        onCrystal();
+        this.onCrystal();
     }
 
     @Override
     public String getDisplayInfo() {
-        if (realTarget != null) {
-            return realTarget.getName();
+        if (this.realTarget != null) {
+            return this.realTarget.getName();
         }
         return null;
     }
@@ -204,131 +220,153 @@ public class OyVeyAutoCrystal extends Module {
         if (OyVeyAutoCrystal.mc.world == null || OyVeyAutoCrystal.mc.player == null) {
             return;
         }
-        realTarget = null;
-        manualBreaker();
-        crystalCount = 0;
-        if (!ignoreUseAmount.getValue().booleanValue()) {
+        this.realTarget = null;
+        this.manualBreaker();
+        this.crystalCount = 0;
+        if (!this.ignoreUseAmount.getValue()) {
             for (Entity crystal : OyVeyAutoCrystal.mc.world.loadedEntityList) {
-                if (!(crystal instanceof EntityEnderCrystal) || !IsValidCrystal(crystal)) continue;
+                if (!(crystal instanceof EntityEnderCrystal) || !this.IsValidCrystal(crystal)) continue;
                 boolean count = false;
-                double damage = calculateDamage((double) target.getPosition().getX() + 0.5, (double) target.getPosition().getY() + 1.0, (double) target.getPosition().getZ() + 0.5, target);
-                if (damage >= (double) minDamage.getValue().floatValue()) {
+                double damage = this.calculateDamage((double) this.target.getPosition().getX() + 0.5, (double) this.target.getPosition().getY() + 1.0, (double) this.target.getPosition().getZ() + 0.5, this.target);
+                if (damage >= (double) this.minDamage.getValue()) {
                     count = true;
                 }
                 if (!count) continue;
-                ++crystalCount;
+                ++this.crystalCount;
             }
         }
-        hotBarSlot = -1;
+        this.hotBarSlot = -1;
         if (OyVeyAutoCrystal.mc.player.getHeldItemOffhand().getItem() != Items.END_CRYSTAL) {
             int crystalSlot;
-            int n = crystalSlot = OyVeyAutoCrystal.mc.player.getHeldItemMainhand().getItem() == Items.END_CRYSTAL ? OyVeyAutoCrystal.mc.player.inventory.currentItem : -1;
+            crystalSlot = OyVeyAutoCrystal.mc.player.getHeldItemMainhand().getItem() == Items.END_CRYSTAL ? OyVeyAutoCrystal.mc.player.inventory.currentItem : -1;
             if (crystalSlot == -1) {
                 for (int l = 0; l < 9; ++l) {
                     if (OyVeyAutoCrystal.mc.player.inventory.getStackInSlot(l).getItem() != Items.END_CRYSTAL) continue;
                     crystalSlot = l;
-                    hotBarSlot = l;
+                    this.hotBarSlot = l;
                     break;
                 }
             }
             if (crystalSlot == -1) {
-                pos = null;
-                target = null;
+                this.pos = null;
+                this.target = null;
                 return;
             }
         }
         if (OyVeyAutoCrystal.mc.player.getHeldItemOffhand().getItem() == Items.GOLDEN_APPLE && OyVeyAutoCrystal.mc.player.getHeldItemMainhand().getItem() != Items.END_CRYSTAL) {
-            pos = null;
-            target = null;
+            this.pos = null;
+            this.target = null;
             return;
         }
-        if (target == null) {
-            target = getTarget();
+        if (this.target == null) {
+            this.target = this.getTarget();
         }
-        if (target == null) {
-            crystal = null;
+        if (this.target == null) {
+            this.crystal = null;
             return;
         }
-        if (target.getDistance(OyVeyAutoCrystal.mc.player) > 12.0f) {
-            crystal = null;
-            target = null;
+        if (this.target.getDistance(OyVeyAutoCrystal.mc.player) > 12.0f) {
+            this.crystal = null;
+            this.target = null;
         }
-        crystal = OyVeyAutoCrystal.mc.world.loadedEntityList.stream().filter(this::IsValidCrystal).map(p_Entity -> (EntityEnderCrystal) p_Entity).min(Comparator.comparing(p_Entity -> Float.valueOf(target.getDistance((Entity) p_Entity)))).orElse(null);
-        if (crystal != null && explode.getValue().booleanValue() && breakTimer.passedMs(breakDelay.getValue().longValue())) {
-            breakTimer.reset();
-            if (packetBreak.getValue().booleanValue()) {
-                rotateTo(crystal);
-                OyVeyAutoCrystal.mc.player.connection.sendPacket(new CPacketUseEntity(crystal));
+        this.crystal = OyVeyAutoCrystal.mc.world.loadedEntityList.stream().filter(this::IsValidCrystal).map(p_Entity -> (EntityEnderCrystal) p_Entity).min(Comparator.comparing(p_Entity -> this.target.getDistance(p_Entity))).orElse(null);
+        if (this.crystal != null && this.explode.getValue() && this.breakTimer.passedMs(this.breakDelay.getValue().longValue())) {
+            this.breakTimer.reset();
+            if (this.packetBreak.getValue()) {
+                this.rotateTo(this.crystal);
+                OyVeyAutoCrystal.mc.player.connection.sendPacket(new CPacketUseEntity(this.crystal));
             } else {
-                rotateTo(crystal);
-                OyVeyAutoCrystal.mc.playerController.attackEntity(OyVeyAutoCrystal.mc.player, crystal);
+                this.rotateTo(this.crystal);
+                OyVeyAutoCrystal.mc.playerController.attackEntity(OyVeyAutoCrystal.mc.player, this.crystal);
             }
-            if (swingMode.getValue() == SwingMode.MainHand) {
+            if (this.swingMode.getValue() == SwingMode.MainHand) {
                 OyVeyAutoCrystal.mc.player.swingArm(EnumHand.MAIN_HAND);
-            } else if (swingMode.getValue() == SwingMode.OffHand) {
+            } else if (this.swingMode.getValue() == SwingMode.OffHand) {
                 OyVeyAutoCrystal.mc.player.swingArm(EnumHand.OFF_HAND);
             }
         }
-        if (placeTimer.passedMs(placeDelay.getValue().longValue()) && place.getValue().booleanValue()) {
-            placeTimer.reset();
+        if (this.placeTimer.passedMs(this.placeDelay.getValue().longValue()) && this.place.getValue()) {
+            this.placeTimer.reset();
             double damage = 0.5;
-            for (BlockPos blockPos : placePostions(placeRange.getValue().floatValue())) {
+            for (BlockPos blockPos : this.placePostions(this.placeRange.getValue())) {
                 double selfDmg;
                 double targetRange;
-                if (blockPos == null || target == null || !OyVeyAutoCrystal.mc.world.getEntitiesWithinAABB(Entity.class, new AxisAlignedBB(blockPos)).isEmpty() || (targetRange = target.getDistance(blockPos.getX(), blockPos.getY(), blockPos.getZ())) > (double) this.targetRange.getValue().floatValue() || target.isDead || target.getHealth() + target.getAbsorptionAmount() <= 0.0f)
+                if (blockPos == null || this.target == null || !OyVeyAutoCrystal.mc.world.getEntitiesWithinAABB(Entity.class, new AxisAlignedBB(blockPos)).isEmpty() || (targetRange = this.target.getDistance(blockPos.getX(), blockPos.getY(), blockPos.getZ())) > (double) this.targetRange.getValue() || this.target.isDead || this.target.getHealth() + this.target.getAbsorptionAmount() <= 0.0f)
                     continue;
-                double targetDmg = calculateDamage((double) blockPos.getX() + 0.5, (double) blockPos.getY() + 1.0, (double) blockPos.getZ() + 0.5, target);
-                armor = false;
-                for (ItemStack is : target.getArmorInventoryList()) {
+                double targetDmg = this.calculateDamage((double) blockPos.getX() + 0.5, (double) blockPos.getY() + 1.0, (double) blockPos.getZ() + 0.5, this.target);
+                this.armor = false;
+                for (ItemStack is : this.target.getArmorInventoryList()) {
                     float green = ((float) is.getMaxDamage() - (float) is.getItemDamage()) / (float) is.getMaxDamage();
                     float red = 1.0f - green;
                     int dmg = 100 - (int) (red * 100.0f);
-                    if (!((float) dmg <= minArmor.getValue().floatValue())) continue;
-                    armor = true;
+                    if (!((float) dmg <= this.minArmor.getValue())) continue;
+                    this.armor = true;
                 }
-                if (targetDmg < (double) minDamage.getValue().floatValue() && (facePlaceSword.getValue() != false ? target.getAbsorptionAmount() + target.getHealth() > facePlace.getValue().floatValue() : OyVeyAutoCrystal.mc.player.getHeldItemMainhand().getItem() instanceof ItemSword || target.getAbsorptionAmount() + target.getHealth() > facePlace.getValue().floatValue()) && (facePlaceSword.getValue() != false ? !armor : OyVeyAutoCrystal.mc.player.getHeldItemMainhand().getItem() instanceof ItemSword || !armor) || (selfDmg = calculateDamage((double) blockPos.getX() + 0.5, (double) blockPos.getY() + 1.0, (double) blockPos.getZ() + 0.5, OyVeyAutoCrystal.mc.player)) + (suicide.getValue() != false ? 2.0 : 0.5) >= (double) (OyVeyAutoCrystal.mc.player.getHealth() + OyVeyAutoCrystal.mc.player.getAbsorptionAmount()) && selfDmg >= targetDmg && targetDmg < (double) (target.getHealth() + target.getAbsorptionAmount()) || !(damage < targetDmg))
+                if (targetDmg < (double) this.minDamage.getValue() && (this.facePlaceSword.getValue() ? this.target.getAbsorptionAmount() + this.target.getHealth() > this.facePlace.getValue() : OyVeyAutoCrystal.mc.player.getHeldItemMainhand().getItem() instanceof ItemSword || this.target.getAbsorptionAmount() + this.target.getHealth() > this.facePlace.getValue()) && (this.facePlaceSword.getValue() ? !this.armor : OyVeyAutoCrystal.mc.player.getHeldItemMainhand().getItem() instanceof ItemSword || !this.armor) || (selfDmg = this.calculateDamage((double) blockPos.getX() + 0.5, (double) blockPos.getY() + 1.0, (double) blockPos.getZ() + 0.5, OyVeyAutoCrystal.mc.player)) + (this.suicide.getValue() ? 2.0 : 0.5) >= (double) (OyVeyAutoCrystal.mc.player.getHealth() + OyVeyAutoCrystal.mc.player.getAbsorptionAmount()) && selfDmg >= targetDmg && targetDmg < (double) (this.target.getHealth() + this.target.getAbsorptionAmount()) || !(damage < targetDmg))
                     continue;
-                pos = blockPos;
+                this.pos = blockPos;
                 damage = targetDmg;
             }
             if (damage == 0.5) {
-                pos = null;
-                target = null;
-                realTarget = null;
+                this.pos = null;
+                this.target = null;
+                this.realTarget = null;
                 return;
             }
-            realTarget = target;
-            if (AutoGG.getINSTANCE().isOn()) {
-                AutoGG autoGG = (AutoGG) OyVey.moduleManager.getModuleByName("AutoGG");
-                autoGG.addTargetedPlayer(target.getName());
+            this.realTarget = this.target;
+
+            if (this.hotBarSlot != -1 && this.autoswitch.getValue() && !OyVeyAutoCrystal.mc.player.isPotionActive(MobEffects.WEAKNESS) && this.switchmode.getValue() == SwitchMode.Normal && !this.silentSwitch.getValue()) {
+                OyVeyAutoCrystal.mc.player.inventory.currentItem = this.hotBarSlot;
             }
-            if (hotBarSlot != -1 && autoswitch.getValue().booleanValue() && !OyVeyAutoCrystal.mc.player.isPotionActive(MobEffects.WEAKNESS)) {
-                OyVeyAutoCrystal.mc.player.inventory.currentItem = hotBarSlot;
+
+
+            int slot = InventoryUtil.findHotbarBlock(ItemEndCrystal.class);
+            int old = mc.player.inventory.currentItem;
+            EnumHand hand = null;
+            if (switchmode.getValue() == SwitchMode.Silent) {
+                if (slot != -1) {
+                    if (mc.player.isHandActive() && this.silentSwitch.getValue()) {
+                        hand = mc.player.getActiveHand();
+                    }
+                    mc.player.connection.sendPacket(new CPacketHeldItemChange(slot));
+                }
             }
-            if (!ignoreUseAmount.getValue().booleanValue()) {
-                int crystalLimit = wasteAmount.getValue();
-                if (crystalCount >= crystalLimit) {
+
+            if (!this.ignoreUseAmount.getValue()) {
+                int crystalLimit = this.wasteAmount.getValue();
+                if (this.crystalCount >= crystalLimit) {
                     return;
                 }
-                if (damage < (double) minDamage.getValue().floatValue()) {
+                if (damage < (double) this.minDamage.getValue()) {
                     crystalLimit = 1;
                 }
-                if (crystalCount < crystalLimit && pos != null) {
-                    rotateToPos(pos);
-                    OyVeyAutoCrystal.mc.player.connection.sendPacket(new CPacketPlayerTryUseItemOnBlock(pos, EnumFacing.UP, OyVeyAutoCrystal.mc.player.getHeldItemOffhand().getItem() == Items.END_CRYSTAL ? EnumHand.OFF_HAND : EnumHand.MAIN_HAND, 0.0f, 0.0f, 0.0f));
+                if (this.crystalCount < crystalLimit && this.pos != null) {
+                    this.rotateToPos(this.pos);
+                    OyVeyAutoCrystal.mc.player.connection.sendPacket(new CPacketPlayerTryUseItemOnBlock(this.pos, EnumFacing.UP, OyVeyAutoCrystal.mc.player.getHeldItemOffhand().getItem() == Items.END_CRYSTAL ? EnumHand.OFF_HAND : EnumHand.MAIN_HAND, 0.0f, 0.0f, 0.0f));
                 }
-            } else if (pos != null) {
-                rotateToPos(pos);
-                OyVeyAutoCrystal.mc.player.connection.sendPacket(new CPacketPlayerTryUseItemOnBlock(pos, EnumFacing.UP, OyVeyAutoCrystal.mc.player.getHeldItemOffhand().getItem() == Items.END_CRYSTAL ? EnumHand.OFF_HAND : EnumHand.MAIN_HAND, 0.0f, 0.0f, 0.0f));
+            } else if (this.pos != null) {
+                this.rotateToPos(this.pos);
+                OyVeyAutoCrystal.mc.player.connection.sendPacket(new CPacketPlayerTryUseItemOnBlock(this.pos, EnumFacing.UP, OyVeyAutoCrystal.mc.player.getHeldItemOffhand().getItem() == Items.END_CRYSTAL ? EnumHand.OFF_HAND : EnumHand.MAIN_HAND, 0.0f, 0.0f, 0.0f));
             }
+
+            if (switchmode.getValue() == SwitchMode.Silent) {
+                if (slot != -1) {
+                    if (this.silentSwitch.getValue() && hand != null) {
+                        mc.player.setActiveHand(hand);
+                    }
+                    mc.player.connection.sendPacket(new CPacketHeldItemChange(old));
+
+                }
+            }
+
         }
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST, receiveCanceled = true)
     public void onPacketReceive(PacketEvent.Receive event) {
         SPacketSpawnObject packet;
-        if (event.getPacket() instanceof SPacketSpawnObject && (packet = event.getPacket()).getType() == 51 && predicts.getValue().booleanValue() && preditTimer.passedMs(attackFactor.getValue().longValue()) && predicts.getValue().booleanValue() && explode.getValue().booleanValue() && packetBreak.getValue().booleanValue() && target != null) {
-            if (!isPredicting(packet)) {
+        if (event.getPacket() instanceof SPacketSpawnObject && (packet = event.getPacket()).getType() == 51 && this.predicts.getValue() && this.preditTimer.passedMs(this.attackFactor.getValue().longValue()) && this.predicts.getValue() && this.explode.getValue() && this.packetBreak.getValue() && this.target != null) {
+            if (!this.isPredicting(packet)) {
                 return;
             }
             CPacketUseEntity predict = new CPacketUseEntity();
@@ -340,44 +378,44 @@ public class OyVeyAutoCrystal extends Module {
 
     @Override
     public void onRender3D(Render3DEvent event) {
-        if (pos != null && render.getValue().booleanValue() && target != null) {
-            RenderUtil.drawBoxESP(pos, ClickGui.getInstance().rainbow.getValue() != false ? ColorUtil.rainbow(ClickGui.getInstance().rainbowHue.getValue()) : new Color(red.getValue(), green.getValue(), blue.getValue(), alpha.getValue()), outline.getValue(), ClickGui.getInstance().rainbow.getValue() != false ? ColorUtil.rainbow(ClickGui.getInstance().rainbowHue.getValue()) : new Color(cRed.getValue(), cGreen.getValue(), cBlue.getValue(), cAlpha.getValue()), lineWidth.getValue().floatValue(), outline.getValue(), box.getValue(), boxAlpha.getValue(), true);
-            if (renderDmg.getValue().booleanValue()) {
-                double renderDamage = calculateDamage((double) pos.getX() + 0.5, (double) pos.getY() + 1.0, (double) pos.getZ() + 0.5, target);
-                RenderUtil.drawText(pos, (Math.floor(renderDamage) == renderDamage ? Integer.valueOf((int) renderDamage) : String.format( ChatFormatting.WHITE + "%.1f", renderDamage)) + "");
+        if (this.pos != null && this.render.getValue() && this.target != null) {
+            RenderUtil.drawBoxESP(this.pos, ClickGui.getInstance().rainbow.getValue() ? ColorUtil.rainbow(ClickGui.getInstance().rainbowHue.getValue()) : new Color(this.red.getValue(), this.green.getValue(), this.blue.getValue(), this.alpha.getValue()), this.outline.getValue(), ClickGui.getInstance().rainbow.getValue() ? ColorUtil.rainbow(ClickGui.getInstance().rainbowHue.getValue()) : new Color(this.cRed.getValue(), this.cGreen.getValue(), this.cBlue.getValue(), this.cAlpha.getValue()), this.lineWidth.getValue(), this.outline.getValue(), this.box.getValue(), this.boxAlpha.getValue(), true);
+            if (this.renderDmg.getValue()) {
+                double renderDamage = this.calculateDamage((double) this.pos.getX() + 0.5, (double) this.pos.getY() + 1.0, (double) this.pos.getZ() + 0.5, this.target);
+                RenderUtil.drawText(this.pos, (Math.floor(renderDamage) == renderDamage ? Integer.valueOf((int) renderDamage) : String.format("%.1f", renderDamage)) + "");
             }
         }
     }
 
     private boolean isPredicting(SPacketSpawnObject packet) {
         BlockPos packPos = new BlockPos(packet.getX(), packet.getY(), packet.getZ());
-        if (OyVeyAutoCrystal.mc.player.getDistance(packet.getX(), packet.getY(), packet.getZ()) > (double) breakRange.getValue().floatValue()) {
+        if (OyVeyAutoCrystal.mc.player.getDistance(packet.getX(), packet.getY(), packet.getZ()) > (double) this.breakRange.getValue()) {
             return false;
         }
-        if (!canSeePos(packPos) && OyVeyAutoCrystal.mc.player.getDistance(packet.getX(), packet.getY(), packet.getZ()) > (double) breakWallRange.getValue().floatValue()) {
+        if (!this.canSeePos(packPos) && OyVeyAutoCrystal.mc.player.getDistance(packet.getX(), packet.getY(), packet.getZ()) > (double) this.breakWallRange.getValue()) {
             return false;
         }
-        double targetDmg = calculateDamage(packet.getX() + 0.5, packet.getY() + 1.0, packet.getZ() + 0.5, target);
+        double targetDmg = this.calculateDamage(packet.getX() + 0.5, packet.getY() + 1.0, packet.getZ() + 0.5, this.target);
         if (EntityUtil.isInHole(OyVeyAutoCrystal.mc.player) && targetDmg >= 1.0) {
             return true;
         }
-        double selfDmg = calculateDamage(packet.getX() + 0.5, packet.getY() + 1.0, packet.getZ() + 0.5, OyVeyAutoCrystal.mc.player);
-        double d = suicide.getValue() != false ? 2.0 : 0.5;
-        if (selfDmg + d < (double) (OyVeyAutoCrystal.mc.player.getHealth() + OyVeyAutoCrystal.mc.player.getAbsorptionAmount()) && targetDmg >= (double) (target.getAbsorptionAmount() + target.getHealth())) {
+        double selfDmg = this.calculateDamage(packet.getX() + 0.5, packet.getY() + 1.0, packet.getZ() + 0.5, OyVeyAutoCrystal.mc.player);
+        double d = this.suicide.getValue() ? 2.0 : 0.5;
+        if (selfDmg + d < (double) (OyVeyAutoCrystal.mc.player.getHealth() + OyVeyAutoCrystal.mc.player.getAbsorptionAmount()) && targetDmg >= (double) (this.target.getAbsorptionAmount() + this.target.getHealth())) {
             return true;
         }
-        armorTarget = false;
-        for (ItemStack is : target.getArmorInventoryList()) {
+        this.armorTarget = false;
+        for (ItemStack is : this.target.getArmorInventoryList()) {
             float green = ((float) is.getMaxDamage() - (float) is.getItemDamage()) / (float) is.getMaxDamage();
             float red = 1.0f - green;
             int dmg = 100 - (int) (red * 100.0f);
-            if (!((float) dmg <= minArmor.getValue().floatValue())) continue;
-            armorTarget = true;
+            if (!((float) dmg <= this.minArmor.getValue())) continue;
+            this.armorTarget = true;
         }
-        if (targetDmg >= (double) breakMinDmg.getValue().floatValue() && selfDmg <= (double) breakMaxSelfDamage.getValue().floatValue()) {
+        if (targetDmg >= (double) this.breakMinDmg.getValue() && selfDmg <= (double) this.breakMaxSelfDamage.getValue()) {
             return true;
         }
-        return EntityUtil.isInHole(target) && target.getHealth() + target.getAbsorptionAmount() <= facePlace.getValue().floatValue();
+        return EntityUtil.isInHole(this.target) && this.target.getHealth() + this.target.getAbsorptionAmount() <= this.facePlace.getValue();
     }
 
     private boolean IsValidCrystal(Entity p_Entity) {
@@ -387,39 +425,39 @@ public class OyVeyAutoCrystal extends Module {
         if (!(p_Entity instanceof EntityEnderCrystal)) {
             return false;
         }
-        if (target == null) {
+        if (this.target == null) {
             return false;
         }
-        if (p_Entity.getDistance(OyVeyAutoCrystal.mc.player) > breakRange.getValue().floatValue()) {
+        if (p_Entity.getDistance(OyVeyAutoCrystal.mc.player) > this.breakRange.getValue()) {
             return false;
         }
-        if (!OyVeyAutoCrystal.mc.player.canEntityBeSeen(p_Entity) && p_Entity.getDistance(OyVeyAutoCrystal.mc.player) > breakWallRange.getValue().floatValue()) {
+        if (!OyVeyAutoCrystal.mc.player.canEntityBeSeen(p_Entity) && p_Entity.getDistance(OyVeyAutoCrystal.mc.player) > this.breakWallRange.getValue()) {
             return false;
         }
-        if (target.isDead || target.getHealth() + target.getAbsorptionAmount() <= 0.0f) {
+        if (this.target.isDead || this.target.getHealth() + this.target.getAbsorptionAmount() <= 0.0f) {
             return false;
         }
-        double targetDmg = calculateDamage((double) p_Entity.getPosition().getX() + 0.5, (double) p_Entity.getPosition().getY() + 1.0, (double) p_Entity.getPosition().getZ() + 0.5, target);
+        double targetDmg = this.calculateDamage((double) p_Entity.getPosition().getX() + 0.5, (double) p_Entity.getPosition().getY() + 1.0, (double) p_Entity.getPosition().getZ() + 0.5, this.target);
         if (EntityUtil.isInHole(OyVeyAutoCrystal.mc.player) && targetDmg >= 1.0) {
             return true;
         }
-        double selfDmg = calculateDamage((double) p_Entity.getPosition().getX() + 0.5, (double) p_Entity.getPosition().getY() + 1.0, (double) p_Entity.getPosition().getZ() + 0.5, OyVeyAutoCrystal.mc.player);
-        double d = suicide.getValue() != false ? 2.0 : 0.5;
-        if (selfDmg + d < (double) (OyVeyAutoCrystal.mc.player.getHealth() + OyVeyAutoCrystal.mc.player.getAbsorptionAmount()) && targetDmg >= (double) (target.getAbsorptionAmount() + target.getHealth())) {
+        double selfDmg = this.calculateDamage((double) p_Entity.getPosition().getX() + 0.5, (double) p_Entity.getPosition().getY() + 1.0, (double) p_Entity.getPosition().getZ() + 0.5, OyVeyAutoCrystal.mc.player);
+        double d = this.suicide.getValue() ? 2.0 : 0.5;
+        if (selfDmg + d < (double) (OyVeyAutoCrystal.mc.player.getHealth() + OyVeyAutoCrystal.mc.player.getAbsorptionAmount()) && targetDmg >= (double) (this.target.getAbsorptionAmount() + this.target.getHealth())) {
             return true;
         }
-        armorTarget = false;
-        for (ItemStack is : target.getArmorInventoryList()) {
+        this.armorTarget = false;
+        for (ItemStack is : this.target.getArmorInventoryList()) {
             float green = ((float) is.getMaxDamage() - (float) is.getItemDamage()) / (float) is.getMaxDamage();
             float red = 1.0f - green;
             int dmg = 100 - (int) (red * 100.0f);
-            if (!((float) dmg <= minArmor.getValue().floatValue())) continue;
-            armorTarget = true;
+            if (!((float) dmg <= this.minArmor.getValue())) continue;
+            this.armorTarget = true;
         }
-        if (targetDmg >= (double) breakMinDmg.getValue().floatValue() && selfDmg <= (double) breakMaxSelfDamage.getValue().floatValue()) {
+        if (targetDmg >= (double) this.breakMinDmg.getValue() && selfDmg <= (double) this.breakMaxSelfDamage.getValue()) {
             return true;
         }
-        return EntityUtil.isInHole(target) && target.getHealth() + target.getAbsorptionAmount() <= facePlace.getValue().floatValue();
+        return EntityUtil.isInHole(this.target) && this.target.getHealth() + this.target.getAbsorptionAmount() <= this.facePlace.getValue();
     }
 
     EntityPlayer getTarget() {
@@ -427,15 +465,15 @@ public class OyVeyAutoCrystal extends Module {
         for (EntityPlayer entity : OyVeyAutoCrystal.mc.world.playerEntities) {
             if (OyVeyAutoCrystal.mc.player == null || OyVeyAutoCrystal.mc.player.isDead || entity.isDead || entity == OyVeyAutoCrystal.mc.player || OyVey.friendManager.isFriend(entity.getName()) || entity.getDistance(OyVeyAutoCrystal.mc.player) > 12.0f)
                 continue;
-            armorTarget = false;
+            this.armorTarget = false;
             for (ItemStack is : entity.getArmorInventoryList()) {
                 float green = ((float) is.getMaxDamage() - (float) is.getItemDamage()) / (float) is.getMaxDamage();
                 float red = 1.0f - green;
                 int dmg = 100 - (int) (red * 100.0f);
-                if (!((float) dmg <= minArmor.getValue().floatValue())) continue;
-                armorTarget = true;
+                if (!((float) dmg <= this.minArmor.getValue())) continue;
+                this.armorTarget = true;
             }
-            if (EntityUtil.isInHole(entity) && entity.getAbsorptionAmount() + entity.getHealth() > facePlace.getValue().floatValue() && !armorTarget && minDamage.getValue().floatValue() > 2.2f)
+            if (EntityUtil.isInHole(entity) && entity.getAbsorptionAmount() + entity.getHealth() > this.facePlace.getValue() && !this.armorTarget && this.minDamage.getValue() > 2.2f)
                 continue;
             if (closestPlayer == null) {
                 closestPlayer = entity;
@@ -450,27 +488,27 @@ public class OyVeyAutoCrystal extends Module {
 
     private void manualBreaker() {
         RayTraceResult result;
-        if (manualTimer.passedMs(200L) && OyVeyAutoCrystal.mc.gameSettings.keyBindUseItem.isKeyDown() && OyVeyAutoCrystal.mc.player.getHeldItemOffhand().getItem() != Items.GOLDEN_APPLE && OyVeyAutoCrystal.mc.player.inventory.getCurrentItem().getItem() != Items.GOLDEN_APPLE && OyVeyAutoCrystal.mc.player.inventory.getCurrentItem().getItem() != Items.BOW && OyVeyAutoCrystal.mc.player.inventory.getCurrentItem().getItem() != Items.EXPERIENCE_BOTTLE && (result = OyVeyAutoCrystal.mc.objectMouseOver) != null) {
+        if (this.manualTimer.passedMs(200L) && OyVeyAutoCrystal.mc.gameSettings.keyBindUseItem.isKeyDown() && OyVeyAutoCrystal.mc.player.getHeldItemOffhand().getItem() != Items.GOLDEN_APPLE && OyVeyAutoCrystal.mc.player.inventory.getCurrentItem().getItem() != Items.GOLDEN_APPLE && OyVeyAutoCrystal.mc.player.inventory.getCurrentItem().getItem() != Items.BOW && OyVeyAutoCrystal.mc.player.inventory.getCurrentItem().getItem() != Items.EXPERIENCE_BOTTLE && (result = OyVeyAutoCrystal.mc.objectMouseOver) != null) {
             if (result.typeOfHit.equals(RayTraceResult.Type.ENTITY)) {
                 Entity entity = result.entityHit;
                 if (entity instanceof EntityEnderCrystal) {
-                    if (packetBreak.getValue().booleanValue()) {
+                    if (this.packetBreak.getValue()) {
                         OyVeyAutoCrystal.mc.player.connection.sendPacket(new CPacketUseEntity(entity));
                     } else {
                         OyVeyAutoCrystal.mc.playerController.attackEntity(OyVeyAutoCrystal.mc.player, entity);
                     }
-                    manualTimer.reset();
+                    this.manualTimer.reset();
                 }
             } else if (result.typeOfHit.equals(RayTraceResult.Type.BLOCK)) {
                 BlockPos mousePos = new BlockPos(OyVeyAutoCrystal.mc.objectMouseOver.getBlockPos().getX(), (double) OyVeyAutoCrystal.mc.objectMouseOver.getBlockPos().getY() + 1.0, OyVeyAutoCrystal.mc.objectMouseOver.getBlockPos().getZ());
                 for (Entity target : OyVeyAutoCrystal.mc.world.getEntitiesWithinAABBExcludingEntity(null, new AxisAlignedBB(mousePos))) {
                     if (!(target instanceof EntityEnderCrystal)) continue;
-                    if (packetBreak.getValue().booleanValue()) {
+                    if (this.packetBreak.getValue()) {
                         OyVeyAutoCrystal.mc.player.connection.sendPacket(new CPacketUseEntity(target));
                     } else {
                         OyVeyAutoCrystal.mc.playerController.attackEntity(OyVeyAutoCrystal.mc.player, target);
                     }
-                    manualTimer.reset();
+                    this.manualTimer.reset();
                 }
             }
         }
@@ -482,7 +520,7 @@ public class OyVeyAutoCrystal extends Module {
 
     private NonNullList<BlockPos> placePostions(float placeRange) {
         NonNullList positions = NonNullList.create();
-        positions.addAll(OyVeyAutoCrystal.getSphere(new BlockPos(Math.floor(OyVeyAutoCrystal.mc.player.posX), Math.floor(OyVeyAutoCrystal.mc.player.posY), Math.floor(OyVeyAutoCrystal.mc.player.posZ)), placeRange, (int) placeRange, false, true, 0).stream().filter(pos -> canPlaceCrystal(pos, true)).collect(Collectors.toList()));
+        positions.addAll(OyVeyAutoCrystal.getSphere(new BlockPos(Math.floor(OyVeyAutoCrystal.mc.player.posX), Math.floor(OyVeyAutoCrystal.mc.player.posY), Math.floor(OyVeyAutoCrystal.mc.player.posZ)), placeRange, (int) placeRange, false, true, 0).stream().filter(pos -> this.canPlaceCrystal(pos, true)).collect(Collectors.toList()));
         return positions;
     }
 
@@ -490,7 +528,7 @@ public class OyVeyAutoCrystal extends Module {
         BlockPos boost = blockPos.add(0, 1, 0);
         BlockPos boost2 = blockPos.add(0, 2, 0);
         try {
-            if (!ecmeplace.getValue().booleanValue()) {
+            if (!this.opPlace.getValue()) {
                 if (OyVeyAutoCrystal.mc.world.getBlockState(blockPos).getBlock() != Blocks.BEDROCK && OyVeyAutoCrystal.mc.world.getBlockState(blockPos).getBlock() != Blocks.OBSIDIAN) {
                     return false;
                 }
@@ -543,7 +581,7 @@ public class OyVeyAutoCrystal extends Module {
         float damage = (int) ((v * v + v) / 2.0 * 7.0 * 12.0 + 1.0);
         double finald = 1.0;
         if (entity instanceof EntityLivingBase) {
-            finald = getBlastReduction((EntityLivingBase) entity, getDamageMultiplied(damage), new Explosion(OyVeyAutoCrystal.mc.world, null, posX, posY, posZ, 6.0f, false, true));
+            finald = this.getBlastReduction((EntityLivingBase) entity, this.getDamageMultiplied(damage), new Explosion(OyVeyAutoCrystal.mc.world, null, posX, posY, posZ, 6.0f, false, true));
         }
         return (float) finald;
     }
@@ -583,5 +621,10 @@ public class OyVeyAutoCrystal extends Module {
         None
 
     }
-}
 
+    public enum SwitchMode {
+        Normal,
+        Silent
+    }
+
+}
