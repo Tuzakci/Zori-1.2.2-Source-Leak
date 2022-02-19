@@ -62,6 +62,7 @@ public class ModuleManager
         this.modules.add(new TestNameTags());
         this.modules.add(new TexturedChams());
         this.modules.add(new HitMarkers());
+        this.modules.add(new Aspect());
         //COMBAT
         //fuck zopac
         this.modules.add(new Offhand());
